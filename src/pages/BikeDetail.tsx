@@ -33,11 +33,20 @@ const BikeDetail = () => {
   }, [id]);
 
   const handleAddToCart = () => {
+    if (!bike) return;
+    
+    addToCart({
+      bikeId: bike.id,
+      quantity,
+      rentalDuration
+    });
+    
     toast({
       title: "Велосипед добавлен в корзину",
-      description: `${bike?.title} добавлен в корзину на ${rentalDuration} ч.`,
+      description: `${bike.title} добавлен в корзину на ${rentalDuration} ч.`,
     });
   };
+
 
   if (loading) {
     return (

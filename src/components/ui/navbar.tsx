@@ -63,17 +63,20 @@ const Navbar = () => {
             </Link>
             <Link to="/contacts" className="block hover:text-gray-200 py-2 px-3 transition-colors">
               Контакты
-            </Link>
-            <div className="flex flex-col space-y-2 pt-2">
-              <Link to="/cart" className="block">
-                <Button variant="secondary" size="sm" className="w-full flex items-center justify-center">
-                  <Icon name="ShoppingCart" size={18} className="mr-1" />
+
+              <Link to="/catalog">
+                <Button variant="ghost">Каталог</Button>
+              </Link>
+              <Link to="/cart">
+                <Button variant="ghost">
+                  <Icon name="ShoppingCart" className="mr-2" size={16} />
                   Корзина
                 </Button>
               </Link>
-              <Link to="/login" className="block">
-                <Button variant="outline" size="sm" className="w-full bg-white/10 hover:bg-white/20">
-                  <Icon name="LogIn" size={18} className="mr-1" />
+              <Link to="/admin">
+                <Button variant="ghost">Админ</Button>
+              </Link>
+
                   Войти
                 </Button>
               </Link>
