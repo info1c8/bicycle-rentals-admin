@@ -2,6 +2,7 @@
 import Icon from "@/components/ui/icon";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+
 const AdminDashboard = () => {
   return (
     <div className="space-y-6">
@@ -99,6 +100,7 @@ const AdminDashboard = () => {
     </div>
   );
 };
+
 
 interface DashboardCardProps {
   icon: string;

@@ -21,11 +21,13 @@ const Admin = () => {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
 
   const renderContent = () => {
+
+  const renderContent = () => {
     switch (activeSection) {
       case "dashboard":
         return <AdminDashboard />;
       case "bikes":
-        return <AdminBikeList placeholder />;
+        return <AdminBikeManagement />;
       case "orders":
         return <AdminOrderList placeholder />;
       case "customers":
@@ -36,6 +38,7 @@ const Admin = () => {
         return <AdminDashboard />;
     }
   };
+
 
   return (
     <SidebarProvider>
