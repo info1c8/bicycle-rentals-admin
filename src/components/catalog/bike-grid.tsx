@@ -38,11 +38,13 @@ const BikeCard = ({ id, title, image, category, pricePerHour, available }: Bike)
           </div>
         </div>
         <div className="flex space-x-2">
+
           <Link to={`/bikes/${id}`} className="flex-1">
             <Button variant="outline" size="sm" className="w-full">
               Подробнее
             </Button>
           </Link>
+
           <Button size="sm" className="flex-1" disabled={!available}>
             <Icon name="ShoppingCart" size={16} className="mr-1" />
             Забронировать
