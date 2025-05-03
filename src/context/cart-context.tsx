@@ -1,218 +1,172 @@
 
-import React, { createContext, useContext, useReducer, useEffect } from "react";
-import { CartItem, Cart } from "@/types/cart";
-import { bikeData } from "@/data/bike-data";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
-// Действия для корзины
-type CartAction =
-  | { type: "ADD_ITEM"; payload: CartItem }
-  | { type: "REMOVE_ITEM"; payload: { bikeId: number } }
-  | { type: "UPDATE_QUANTITY"; payload: { bikeId: number; quantity: number } }
-  | { type: "UPDATE_DURATION"; payload: { bikeId: number; rentalDuration: number } }
-  | { type: "CLEAR_CART" };
-
-// Контекст для корзины
-interface CartContextType {
-  cart: Cart;
-  addToCart: (item: CartItem) => void;
-  removeFromCart: (bikeId: number) => void;
-  updateQuantity: (bikeId: number, quantity: number) => void;
-  updateDuration: (bikeId: number, rentalDuration: number) => void;
-  clearCart: () => void;
-  getCalculatedItems: () => CalculatedCartItem[];
+export interface CartItem {
+  id: number;
+  title: string;
+  image: string;
+  quantity: number;
+  unitPrice: number;
+  rentalPeriod: string;
+  totalPrice: number;
+  duration: number;
 }
 
-// Начальное состояние корзины
-const initialCart: Cart = {
+interface CartContextProps {
+  items: CartItem[];
+  addItem: (item: CartItem) => void;
+  updateItemQuantity: (itemId: number, rentalPeriod: string, quantity: number) => void;
+  removeItem: (itemId: number, rentalPeriod: string) => void;
+  clearCart: () => void;
+  getTotalAmount: () => number;
+  getItemCount: () => number;
+  getItemQuantity: (itemId: number, rentalPeriod: string) => number;
+  isCartInitialized: boolean;
+}
+
+const CartContext = createContext<CartContextProps>({
   items: [],
-  totalItems: 0,
-  totalPrice: 0,
-};
+  addItem: () => {},
+  updateItemQuantity: () => {},
+  removeItem: () => {},
+  clearCart: () => {},
+  getTotalAmount: () => 0,
+  getItemCount: () => 0,
+  getItemQuantity: () => 0,
+  isCartInitialized: false
+});
 
-// Создание контекста
-const CartContext = createContext<CartContextType | undefined>(undefined);
+export const useCart = () => useContext(CartContext);
 
-// Редьюсер для корзины
-const cartReducer = (state: Cart, action: CartAction): Cart => {
-  switch (action.type) {
-    case "ADD_ITEM": {
-      const { bikeId, quantity, rentalDuration } = action.payload;
-      
-      // Проверяем, существует ли товар в корзине
-      const existingItemIndex = state.items.findIndex(item => item.bikeId === bikeId);
-      
-      if (existingItemIndex !== -1) {
-        // Если товар уже есть, обновляем его количество
-        const updatedItems = [...state.items];
-        updatedItems[existingItemIndex].quantity += quantity;
-        updatedItems[existingItemIndex].rentalDuration = rentalDuration;
-        
-        // Пересчитываем итоговые значения
-        return calculateCartTotals({
-          ...state,
-          items: updatedItems,
-        });
-      } else {
-        // Если товара нет, добавляем его
-        return calculateCartTotals({
-          ...state,
-          items: [...state.items, action.payload],
-        });
-      }
-    }
-    
-    case "REMOVE_ITEM": {
-      const updatedItems = state.items.filter(item => item.bikeId !== action.payload.bikeId);
-      
-      return calculateCartTotals({
-        ...state,
-        items: updatedItems,
-      });
-    }
-    
-    case "UPDATE_QUANTITY": {
-      const { bikeId, quantity } = action.payload;
-      
-      if (quantity <= 0) {
-        // Если количество <= 0, удаляем товар
-        return cartReducer(state, { type: "REMOVE_ITEM", payload: { bikeId } });
-      }
-      
-      const updatedItems = state.items.map(item => 
-        item.bikeId === bikeId 
-          ? { ...item, quantity } 
-          : item
-      );
-      
-      return calculateCartTotals({
-        ...state,
-        items: updatedItems,
-      });
-    }
-    
-    case "UPDATE_DURATION": {
-      const { bikeId, rentalDuration } = action.payload;
-      
-      const updatedItems = state.items.map(item => 
-        item.bikeId === bikeId 
-          ? { ...item, rentalDuration } 
-          : item
-      );
-      
-      return calculateCartTotals({
-        ...state,
-        items: updatedItems,
-      });
-    }
-    
-    case "CLEAR_CART": {
-      return initialCart;
-    }
-    
-    default:
-      return state;
-  }
-};
+interface CartProviderProps {
+  children: React.ReactNode;
+}
 
-// Вспомогательная функция для расчета итогов корзины
-const calculateCartTotals = (cart: Cart): Cart => {
-  const totalItems = cart.items.reduce((total, item) => total + item.quantity, 0);
+export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [isCartInitialized, setIsCartInitialized] = useState(false);
   
-  const totalPrice = cart.items.reduce((total, item) => {
-    const bike = bikeData.find(b => b.id === item.bikeId);
-    if (!bike) return total;
-    
-    return total + bike.pricePerHour * item.quantity * item.rentalDuration;
-  }, 0);
-  
-  return {
-    ...cart,
-    totalItems,
-    totalPrice,
-  };
-};
-
-// Вспомогательный тип для расчетных элементов корзины
-type CalculatedCartItem = {
-  bikeId: number;
-  quantity: number;
-  rentalDuration: number;
-  bike: (typeof bikeData)[0];
-  totalPrice: number;
-};
-
-// Провайдер корзины
-export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Загружаем корзину из localStorage при инициализации
-  const savedCart = localStorage.getItem("cart");
-  const initialState = savedCart ? JSON.parse(savedCart) : initialCart;
-  
-  const [cart, dispatch] = useReducer(cartReducer, initialState);
-  
-  // Сохраняем корзину в localStorage при изменении
+  // Загрузка корзины из localStorage при инициализации
   useEffect(() => {
-    localStorage.setItem("cart", JSON.stringify(cart));
-  }, [cart]);
+    try {
+      const storedCart = localStorage.getItem("velorent-cart");
+      if (storedCart) {
+        const parsedCart = JSON.parse(storedCart);
+        if (Array.isArray(parsedCart)) {
+          setItems(parsedCart);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading cart from localStorage:", error);
+    } finally {
+      // Даже если возникла ошибка при загрузке, отмечаем, что корзина инициализирована
+      setIsCartInitialized(true);
+    }
+  }, []);
   
-  // Функции для работы с корзиной
-  const addToCart = (item: CartItem) => {
-    dispatch({ type: "ADD_ITEM", payload: item });
-  };
+  // Сохранение корзины в localStorage при изменении
+  useEffect(() => {
+    if (isCartInitialized) {
+      try {
+        localStorage.setItem("velorent-cart", JSON.stringify(items));
+      } catch (error) {
+        console.error("Error saving cart to localStorage:", error);
+      }
+    }
+  }, [items, isCartInitialized]);
   
-  const removeFromCart = (bikeId: number) => {
-    dispatch({ type: "REMOVE_ITEM", payload: { bikeId } });
-  };
-  
-  const updateQuantity = (bikeId: number, quantity: number) => {
-    dispatch({ type: "UPDATE_QUANTITY", payload: { bikeId, quantity } });
-  };
-  
-  const updateDuration = (bikeId: number, rentalDuration: number) => {
-    dispatch({ type: "UPDATE_DURATION", payload: { bikeId, rentalDuration } });
-  };
-  
-  const clearCart = () => {
-    dispatch({ type: "CLEAR_CART" });
-  };
-  
-  // Функция для получения рассчитанных элементов корзины с данными о велосипедах
-  const getCalculatedItems = (): CalculatedCartItem[] => {
-    return cart.items.map(item => {
-      const bike = bikeData.find(b => b.id === item.bikeId)!;
-      const totalPrice = bike.pricePerHour * item.quantity * item.rentalDuration;
+  // Добавление элемента в корзину
+  const addItem = (newItem: CartItem) => {
+    setItems(prevItems => {
+      // Проверяем, есть ли уже такой элемент в корзине с таким же периодом аренды
+      const existingItemIndex = prevItems.findIndex(
+        item => item.id === newItem.id && item.rentalPeriod === newItem.rentalPeriod
+      );
       
-      return {
-        ...item,
-        bike,
-        totalPrice,
-      };
+      if (existingItemIndex >= 0) {
+        // Если элемент уже существует, обновляем его количество
+        const updatedItems = [...prevItems];
+        const existingItem = updatedItems[existingItemIndex];
+        const newQuantity = existingItem.quantity + newItem.quantity;
+        
+        updatedItems[existingItemIndex] = {
+          ...existingItem,
+          quantity: newQuantity,
+          totalPrice: existingItem.unitPrice * newQuantity
+        };
+        
+        return updatedItems;
+      } else {
+        // Иначе добавляем новый элемент
+        return [...prevItems, newItem];
+      }
     });
   };
   
+  // Обновление количества элемента
+  const updateItemQuantity = (itemId: number, rentalPeriod: string, quantity: number) => {
+    // Проверяем, что quantity больше 0
+    if (quantity <= 0) return;
+    
+    setItems(prevItems => {
+      return prevItems.map(item => {
+        if (item.id === itemId && item.rentalPeriod === rentalPeriod) {
+          return {
+            ...item,
+            quantity,
+            totalPrice: item.unitPrice * quantity
+          };
+        }
+        return item;
+      });
+    });
+  };
+  
+  // Удаление элемента из корзины
+  const removeItem = (itemId: number, rentalPeriod: string) => {
+    setItems(prevItems => 
+      prevItems.filter(item => !(item.id === itemId && item.rentalPeriod === rentalPeriod))
+    );
+  };
+  
+  // Очистка корзины
+  const clearCart = () => {
+    setItems([]);
+  };
+  
+  // Получение общей суммы
+  const getTotalAmount = () => {
+    return items.reduce((total, item) => total + item.totalPrice, 0);
+  };
+  
+  // Получение общего количества элементов
+  const getItemCount = () => {
+    return items.reduce((count, item) => count + item.quantity, 0);
+  };
+  
+  // Получение количества конкретного элемента с указанным периодом аренды
+  const getItemQuantity = (itemId: number, rentalPeriod: string) => {
+    const item = items.find(item => item.id === itemId && item.rentalPeriod === rentalPeriod);
+    return item ? item.quantity : 0;
+  };
+  
+  const value = {
+    items,
+    addItem,
+    updateItemQuantity,
+    removeItem,
+    clearCart,
+    getTotalAmount,
+    getItemCount,
+    getItemQuantity,
+    isCartInitialized
+  };
+  
   return (
-    <CartContext.Provider
-      value={{
-        cart,
-        addToCart,
-        removeFromCart,
-        updateQuantity,
-        updateDuration,
-        clearCart,
-        getCalculatedItems,
-      }}
-    >
+    <CartContext.Provider value={value}>
       {children}
     </CartContext.Provider>
   );
 };
 
-// Хук для использования контекста корзины
-export const useCart = () => {
-  const context = useContext(CartContext);
-  
-  if (context === undefined) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
-  
-  return context;
-};
+export default CartContext;

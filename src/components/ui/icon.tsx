@@ -1,28 +1,26 @@
 
-import React from "react";
-import * as LucideIcons from "lucide-react";
+import * as Icons from "lucide-react";
 
-type IconProps = {
+interface IconProps extends Omit<React.SVGProps<SVGSVGElement>, "name"> {
   name: string;
   color?: string;
   size?: number;
   strokeWidth?: number;
   className?: string;
   fallback?: string;
-  onClick?: () => void;
-};
+}
 
-const Icon: React.FC<IconProps> = ({
+const Icon = ({
   name,
   color,
   size = 24,
   strokeWidth = 2,
   className = "",
   fallback = "CircleAlert",
-  onClick,
-}) => {
-  // @ts-ignore - dynamic access
-  const LucideIcon = LucideIcons[name] || LucideIcons[fallback];
+  ...props
+}: IconProps) => {
+  // @ts-ignore - dynamic import
+  const LucideIcon = Icons[name] || Icons[fallback];
 
   return (
     <LucideIcon
@@ -30,7 +28,7 @@ const Icon: React.FC<IconProps> = ({
       size={size}
       strokeWidth={strokeWidth}
       className={className}
-      onClick={onClick}
+      {...props}
     />
   );
 };

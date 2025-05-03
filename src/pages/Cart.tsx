@@ -1,378 +1,669 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useCart } from "@/context/cart-context";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import {
-  Card,
-  CardContent,
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { 
+  Card, 
+  CardContent, 
   CardDescription,
   CardFooter,
-  CardHeader,
-  CardTitle,
+  CardHeader, 
+  CardTitle 
 } from "@/components/ui/card";
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import Navbar from "@/components/ui/navbar";
-import Footer from "@/components/ui/footer";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import Icon from "@/components/ui/icon";
+import { useCart } from "@/context/cart-context";
 import { useToast } from "@/hooks/use-toast";
+import { bikeData } from "@/data/bike-data";
 
+/**
+ * Страница корзины
+ */
 const Cart = () => {
-  const { cart, removeFromCart, updateQuantity, updateDuration, clearCart, getCalculatedItems } = useCart();
-  const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
+  const { 
+    items, 
+    updateItemQuantity, 
+    removeItem, 
+    clearCart,
+    getTotalAmount,
+    getItemCount
+  } = useCart();
   const { toast } = useToast();
-
-  const calculatedItems = getCalculatedItems();
-
+  const navigate = useNavigate();
+  
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: "",
+    comments: "",
+  });
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(),
+    endDate: new Date(new Date().setDate(new Date().getDate() + 1)),
+  });
+  const [isTermsAccepted, setIsTermsAccepted] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(0);
+  
+  const totalAmount = getTotalAmount();
+  const itemsCount = getItemCount();
+  
   // Обработчик оформления заказа
   const handleCheckout = () => {
-    toast({
-      title: "Заказ оформлен",
-      description: `Ваш заказ на сумму ${cart.totalPrice} ₽ успешно оформлен.`,
-    });
-    clearCart();
-    setIsCheckoutDialogOpen(false);
+    if (!isTermsAccepted) {
+      toast({
+        title: "Необходимо принять условия",
+        description: "Пожалуйста, согласитесь с условиями аренды для продолжения.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Проверяем заполнение обязательных полей
+    if (!customerInfo.name || !customerInfo.phone || !customerInfo.email) {
+      toast({
+        title: "Заполните обязательные поля",
+        description: "Пожалуйста, укажите ваше имя, телефон и email.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsProcessing(true);
+    
+    // Имитируем отправку заказа на сервер
+    setTimeout(() => {
+      setIsProcessing(false);
+      setIsCheckoutOpen(false);
+      
+      // Перенаправление на страницу благодарности
+      navigate("/cart/success");
+      
+      // Очистка корзины
+      clearCart();
+      
+      toast({
+        title: "Заказ успешно оформлен",
+        description: "Мы свяжемся с вами в ближайшее время для подтверждения заказа.",
+      });
+    }, 1500);
   };
-
-  if (calculatedItems.length === 0) {
+  
+  // Обработчик применения промокода
+  const handleApplyDiscount = () => {
+    if (!discountCode) return;
+    
+    if (discountCode.toUpperCase() === "BIKE10") {
+      const discount = Math.round(totalAmount * 0.1);
+      setDiscountAmount(discount);
+      setDiscountApplied(true);
+      
+      toast({
+        title: "Промокод применен",
+        description: `Скидка 10% (${discount} ₽) применена к вашему заказу.`,
+      });
+    } else {
+      toast({
+        title: "Промокод не найден",
+        description: "Указанный промокод не существует или истек срок его действия.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Форматирование даты
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+  
+  // Если корзина пуста
+  if (items.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-grow">
-          <div className="container mx-auto px-4 py-12 text-center">
-            <div className="max-w-md mx-auto">
-              <Icon 
-                name="ShoppingCart" 
-                size={64} 
-                className="mx-auto mb-6 text-gray-300" 
-              />
-              <h1 className="text-2xl font-bold mb-4">Корзина пуста</h1>
-              <p className="text-gray-600 mb-8">
-                Ваша корзина пуста. Добавьте велосипеды из нашего каталога, чтобы продолжить.
-              </p>
-              <Link to="/catalog">
-                <Button className="px-6">
-                  <Icon name="Bike" className="mr-2" size={18} />
-                  Перейти в каталог
-                </Button>
-              </Link>
-            </div>
+      <div className="container py-12">
+        <div className="max-w-md mx-auto text-center space-y-6">
+          <div className="p-6 rounded-full bg-muted inline-flex">
+            <Icon name="ShoppingCart" size={48} className="text-muted-foreground" />
           </div>
-        </main>
-        <Footer />
+          <div>
+            <h1 className="text-2xl font-bold mb-2">Ваша корзина пуста</h1>
+            <p className="text-muted-foreground mb-4">
+              В вашей корзине нет товаров. Перейдите в каталог, чтобы выбрать велосипеды для аренды.
+            </p>
+            <Button asChild>
+              <Link to="/catalog">
+                <Icon name="Bike" className="mr-2" size={16} />
+                Перейти в каталог
+              </Link>
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
-
+  
+  // Получаем велосипеды, которые находятся в корзине
+  const bikesInCart = items.map(item => {
+    const bikeDetails = bikeData.find(bike => bike.id === item.id);
+    return { ...item, details: bikeDetails };
+  });
+  
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-grow">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Левая часть - список товаров */}
-            <div className="w-full lg:w-2/3">
-              <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold">Корзина</h1>
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-6">Корзина</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Выбранные велосипеды</CardTitle>
+              <CardDescription>
+                В вашей корзине {itemsCount} {itemsCount === 1 ? 'товар' : itemsCount < 5 ? 'товара' : 'товаров'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Велосипед</TableHead>
+                      <TableHead className="text-center">Период</TableHead>
+                      <TableHead className="text-center">Кол-во</TableHead>
+                      <TableHead className="text-right">Цена</TableHead>
+                      <TableHead className="text-right">Сумма</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bikesInCart.map((item) => (
+                      <TableRow key={`${item.id}-${item.rentalPeriod}`}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="h-10 w-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                              <img
+                                src={item.image}
+                                alt={item.title}
+                                className="h-full w-full object-cover"
+                                onError={(e) => (e.target as HTMLImageElement).src = "/placeholder.svg"}
+                              />
+                            </div>
+                            <div>
+                              <div className="font-medium">
+                                <Link to={`/bike/${item.id}`} className="hover:text-primary hover:underline">
+                                  {item.title}
+                                </Link>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {item.details?.category || "Велосипед"}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline">{item.rentalPeriod}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 rounded-r-none"
+                              onClick={() => updateItemQuantity(item.id, item.rentalPeriod, Math.max(1, item.quantity - 1))}
+                              disabled={item.quantity <= 1}
+                            >
+                              <Icon name="Minus" size={14} />
+                            </Button>
+                            <div className="px-3 h-8 flex items-center justify-center border-y">
+                              {item.quantity}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-8 w-8 rounded-l-none"
+                              onClick={() => {
+                                const maxAvailability = item.details?.availability || 10;
+                                updateItemQuantity(item.id, item.rentalPeriod, Math.min(maxAvailability, item.quantity + 1));
+                              }}
+                              disabled={item.quantity >= (item.details?.availability || 10)}
+                            >
+                              <Icon name="Plus" size={14} />
+                            </Button>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{item.unitPrice} ₽</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {item.totalPrice} ₽
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeItem(item.id, item.rentalPeriod)}
+                          >
+                            <Icon name="X" size={16} />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={clearCart}>
+                <Icon name="Trash2" className="mr-2" size={16} />
+                Очистить корзину
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/catalog">
+                  <Icon name="ArrowLeft" className="mr-2" size={16} />
+                  Продолжить выбор
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+          
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Период аренды</CardTitle>
+              <CardDescription>
+                Выберите даты начала и окончания аренды
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start-date">Дата начала</Label>
+                  <div className="relative">
+                    <Input 
+                      id="start-date" 
+                      type="date" 
+                      value={dateRange.startDate.toISOString().substring(0, 10)}
+                      onChange={(e) => {
+                        const newStartDate = new Date(e.target.value);
+                        setDateRange({
+                          ...dateRange,
+                          startDate: newStartDate,
+                          endDate: new Date(Math.max(newStartDate.getTime(), dateRange.endDate.getTime()))
+                        });
+                      }}
+                      min={new Date().toISOString().substring(0, 10)}
+                    />
+                    <Icon 
+                      name="Calendar" 
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" 
+                      size={16} 
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="end-date">Дата окончания</Label>
+                  <div className="relative">
+                    <Input 
+                      id="end-date" 
+                      type="date" 
+                      value={dateRange.endDate.toISOString().substring(0, 10)}
+                      onChange={(e) => {
+                        const newEndDate = new Date(e.target.value);
+                        if (newEndDate >= dateRange.startDate) {
+                          setDateRange({
+                            ...dateRange,
+                            endDate: newEndDate
+                          });
+                        }
+                      }}
+                      min={dateRange.startDate.toISOString().substring(0, 10)}
+                    />
+                    <Icon 
+                      name="Calendar" 
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" 
+                      size={16} 
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="rounded-md bg-muted/50 p-3">
+                <div className="flex items-center">
+                  <Icon name="Info" className="mr-2 text-blue-500" size={16} />
+                  <span className="text-sm">
+                    Период аренды: с {formatDate(dateRange.startDate)} по {formatDate(dateRange.endDate)} 
+                    ({Math.ceil((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24))} дней)
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle>Итого</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                {items.map((item) => (
+                  <div key={`${item.id}-${item.rentalPeriod}-summary`} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {item.title} × {item.quantity} ({item.rentalPeriod})
+                    </span>
+                    <span>{item.totalPrice} ₽</span>
+                  </div>
+                ))}
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Общая сумма:</span>
+                  <span className="font-medium">{totalAmount} ₽</span>
+                </div>
+                {discountApplied && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Скидка:</span>
+                    <span>-{discountAmount} ₽</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Input 
+                  placeholder="Промокод"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value)}
+                  disabled={discountApplied}
+                  className="flex-1"
+                />
                 <Button 
                   variant="outline" 
-                  onClick={clearCart}
-                  className="text-sm"
+                  onClick={handleApplyDiscount}
+                  disabled={discountApplied || !discountCode}
                 >
-                  <Icon name="Trash2" className="mr-2" size={16} />
-                  Очистить корзину
+                  Применить
                 </Button>
               </div>
-
-              <Card>
-                <CardContent className="p-0">
-                  {calculatedItems.map((item) => (
-                    <div key={item.bikeId} className="p-4 border-b last:border-0">
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Изображение велосипеда */}
-                        <div className="w-24 h-24 rounded-md overflow-hidden shrink-0">
-                          <img
-                            src={item.bike.image}
-                            alt={item.bike.title}
-                            className="w-full h-full object-cover"
+              
+              {discountApplied && (
+                <div className="rounded-md bg-green-50 p-2">
+                  <div className="flex items-center text-green-700 text-sm">
+                    <Icon name="Check" className="mr-2" size={16} />
+                    <span>Промокод BIKE10 применен (скидка 10%)</span>
+                  </div>
+                </div>
+              )}
+              
+              <Separator />
+              
+              <div className="flex justify-between items-end">
+                <div>
+                  <div className="text-muted-foreground">К оплате:</div>
+                  <div className="text-2xl font-bold">
+                    {discountApplied ? totalAmount - discountAmount : totalAmount} ₽
+                  </div>
+                </div>
+                <Sheet open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+                  <SheetTrigger asChild>
+                    <Button size="lg">
+                      <Icon name="CreditCard" className="mr-2" size={16} />
+                      Оформить заказ
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full sm:max-w-lg overflow-auto">
+                    <SheetHeader>
+                      <SheetTitle>Оформление заказа</SheetTitle>
+                      <SheetDescription>
+                        Введите ваши данные для оформления заказа
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-6 mt-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Имя и фамилия <span className="text-red-500">*</span></Label>
+                          <Input 
+                            id="name" 
+                            placeholder="Иван Иванов" 
+                            value={customerInfo.name}
+                            onChange={(e) => setCustomerInfo({...customerInfo, name: e.target.value})}
+                            required
                           />
                         </div>
                         
-                        {/* Информация о велосипеде */}
-                        <div className="flex-grow">
-                          <div className="flex flex-wrap justify-between mb-2">
-                            <h3 className="font-medium">{item.bike.title}</h3>
-                            <div className="font-semibold">
-                              {item.totalPrice} ₽
-                            </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Телефон <span className="text-red-500">*</span></Label>
+                          <Input 
+                            id="phone" 
+                            placeholder="+7 (999) 123-45-67" 
+                            value={customerInfo.phone}
+                            onChange={(e) => setCustomerInfo({...customerInfo, phone: e.target.value})}
+                            required
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
+                          <Input 
+                            id="email" 
+                            type="email" 
+                            placeholder="your@email.com" 
+                            value={customerInfo.email}
+                            onChange={(e) => setCustomerInfo({...customerInfo, email: e.target.value})}
+                            required
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="address">Адрес (необязательно)</Label>
+                          <Textarea 
+                            id="address" 
+                            placeholder="Город, улица, дом, квартира" 
+                            value={customerInfo.address}
+                            onChange={(e) => setCustomerInfo({...customerInfo, address: e.target.value})}
+                          />
+                          <div className="text-sm text-muted-foreground">
+                            Адрес для доставки, если вы хотите, чтобы велосипеды привезли к вам
                           </div>
+                        </div>
+                      </div>
+                      
+                      <Separator />
+                      
+                      <div className="space-y-4">
+                        <h3 className="font-medium">Способ оплаты</h3>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Card 
+                            className={`cursor-pointer hover:border-primary transition-colors ${paymentMethod === "card" ? 'border-primary bg-muted/30' : ''}`}
+                            onClick={() => setPaymentMethod("card")}
+                          >
+                            <CardContent className="p-3 flex flex-col items-center justify-center gap-1 text-center">
+                              <Icon name="CreditCard" size={24} className="mb-1" />
+                              <div className="text-sm font-medium">Карта</div>
+                            </CardContent>
+                          </Card>
                           
-                          <div className="text-sm text-gray-600 mb-3">
-                            {item.bike.category} • {item.bike.pricePerHour} ₽/час
+                          <Card 
+                            className={`cursor-pointer hover:border-primary transition-colors ${paymentMethod === "cash" ? 'border-primary bg-muted/30' : ''}`}
+                            onClick={() => setPaymentMethod("cash")}
+                          >
+                            <CardContent className="p-3 flex flex-col items-center justify-center gap-1 text-center">
+                              <Icon name="Banknote" size={24} className="mb-1" />
+                              <div className="text-sm font-medium">Наличные</div>
+                            </CardContent>
+                          </Card>
+                          
+                          <Card 
+                            className={`cursor-pointer hover:border-primary transition-colors ${paymentMethod === "online" ? 'border-primary bg-muted/30' : ''}`}
+                            onClick={() => setPaymentMethod("online")}
+                          >
+                            <CardContent className="p-3 flex flex-col items-center justify-center gap-1 text-center">
+                              <Icon name="Globe" size={24} className="mb-1" />
+                              <div className="text-sm font-medium">Онлайн</div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                      
+                      <Separator />
+                      
+                      <div className="space-y-4">
+                        <h3 className="font-medium">Детали заказа</h3>
+                        <div className="text-sm space-y-2 bg-muted/40 p-3 rounded-md">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Количество товаров:</span>
+                            <span>{itemsCount}</span>
                           </div>
-                          
-                          <div className="flex flex-wrap gap-4">
-                            {/* Управление количеством */}
-                            <div className="flex items-center">
-                              <span className="text-sm mr-2">Количество:</span>
-                              <div className="flex border rounded-md">
-                                <button
-                                  className="px-2 py-0.5 text-gray-600"
-                                  onClick={() => updateQuantity(item.bikeId, item.quantity - 1)}
-                                  disabled={item.quantity <= 1}
-                                >
-                                  -
-                                </button>
-                                <span className="px-2 py-0.5 border-x min-w-[30px] text-center">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  className="px-2 py-0.5 text-gray-600"
-                                  onClick={() => updateQuantity(item.bikeId, item.quantity + 1)}
-                                >
-                                  +
-                                </button>
-                              </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Период аренды:</span>
+                            <span>{formatDate(dateRange.startDate)} - {formatDate(dateRange.endDate)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Сумма:</span>
+                            <span>{totalAmount} ₽</span>
+                          </div>
+                          {discountApplied && (
+                            <div className="flex justify-between text-green-600">
+                              <span>Скидка:</span>
+                              <span>-{discountAmount} ₽</span>
                             </div>
-                            
-                            {/* Управление длительностью */}
-                            <div className="flex items-center">
-                              <span className="text-sm mr-2">Длительность:</span>
-                              <select
-                                className="border rounded-md p-1 text-sm"
-                                value={item.rentalDuration}
-                                onChange={(e) => updateDuration(item.bikeId, Number(e.target.value))}
-                              >
-                                {[1, 2, 3, 4, 5, 6, 12, 24, 48, 72].map((hours) => (
-                                  <option key={hours} value={hours}>
-                                    {hours} {getHoursText(hours)}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                          )}
+                          <Separator className="my-1" />
+                          <div className="flex justify-between font-medium">
+                            <span>Итого:</span>
+                            <span>{discountApplied ? totalAmount - discountAmount : totalAmount} ₽</span>
                           </div>
                         </div>
                         
-                        {/* Кнопка удаления */}
-                        <div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFromCart(item.bikeId)}
-                            className="text-gray-500 hover:text-red-500"
-                          >
-                            <Icon name="Trash" size={16} />
-                          </Button>
+                        <div className="space-y-2">
+                          <Label htmlFor="comments">Комментарий к заказу</Label>
+                          <Textarea 
+                            id="comments" 
+                            placeholder="Дополнительная информация по заказу" 
+                            value={customerInfo.comments}
+                            onChange={(e) => setCustomerInfo({...customerInfo, comments: e.target.value})}
+                          />
                         </div>
                       </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="terms" 
+                          checked={isTermsAccepted}
+                          onCheckedChange={(checked) => setIsTermsAccepted(checked as boolean)}
+                        />
+                        <label
+                          htmlFor="terms"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Я согласен с <Link to="/terms" className="text-blue-600 hover:underline" target="_blank">условиями аренды</Link> и <Link to="/privacy" className="text-blue-600 hover:underline" target="_blank">политикой конфиденциальности</Link>
+                        </label>
+                      </div>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-            
-            {/* Правая часть - сводка заказа */}
-            <div className="w-full lg:w-1/3">
-              <h2 className="text-xl font-bold mb-6">Сводка заказа</h2>
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>Итого</CardTitle>
-                  <CardDescription>
-                    {cart.totalItems} {getItemsText(cart.totalItems)} для аренды
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pb-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Стоимость аренды</span>
-                      <span>{cart.totalPrice} ₽</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Залог</span>
-                      <span>{calculateDeposit(calculatedItems)} ₽</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-bold pt-1">
-                      <span>К оплате</span>
-                      <span>{cart.totalPrice} ₽</span>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Dialog open={isCheckoutDialogOpen} onOpenChange={setIsCheckoutDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="w-full">
-                        <Icon name="CreditCard" className="mr-2" size={18} />
-                        Оформить заказ
+                    <SheetFooter className="mt-6">
+                      <Button 
+                        onClick={handleCheckout} 
+                        disabled={isProcessing}
+                        className="w-full"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <Icon name="Loader2" className="mr-2 animate-spin" size={16} />
+                            Обработка...
+                          </>
+                        ) : (
+                          <>
+                            {paymentMethod === "card" && <Icon name="CreditCard" className="mr-2" size={16} />}
+                            {paymentMethod === "cash" && <Icon name="Banknote" className="mr-2" size={16} />}
+                            {paymentMethod === "online" && <Icon name="Globe" className="mr-2" size={16} />}
+                            Оплатить {discountApplied ? totalAmount - discountAmount : totalAmount} ₽
+                          </>
+                        )}
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <CheckoutForm 
-                        totalAmount={cart.totalPrice} 
-                        depositAmount={calculateDeposit(calculatedItems)}
-                        onCheckout={handleCheckout} 
-                        onCancel={() => setIsCheckoutDialogOpen(false)} 
-                      />
-                    </DialogContent>
-                  </Dialog>
-                </CardFooter>
-              </Card>
-              
-              <div className="mt-6 text-sm text-gray-600 space-y-2">
-                <p>
-                  <Icon name="Info" size={14} className="inline-block mr-1" />
-                  Залог возвращается при возврате велосипеда.
-                </p>
-                <p>
-                  <Icon name="Calendar" size={14} className="inline-block mr-1" />
-                  Время аренды начинается с момента получения велосипеда.
-                </p>
-                <p>
-                  <Icon name="Shield" size={14} className="inline-block mr-1" />
-                  Оплата производится при получении велосипеда.
-                </p>
+                    </SheetFooter>
+                  </SheetContent>
+                </Sheet>
               </div>
-            </div>
-          </div>
-        </div>
-      </main>
-      <Footer />
-    </div>
-  );
-};
-
-// Компонент формы оформления заказа
-interface CheckoutFormProps {
-  totalAmount: number;
-  depositAmount: number;
-  onCheckout: () => void;
-  onCancel: () => void;
-}
-
-const CheckoutForm = ({ totalAmount, depositAmount, onCheckout, onCancel }: CheckoutFormProps) => {
-  return (
-    <>
-      <DialogHeader>
-        <DialogTitle>Оформление заказа</DialogTitle>
-        <DialogDescription>
-          Заполните ваши данные для оформления заказа
-        </DialogDescription>
-      </DialogHeader>
-      
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label htmlFor="first-name" className="text-sm font-medium">
-              Имя
-            </label>
-            <Input id="first-name" />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="last-name" className="text-sm font-medium">
-              Фамилия
-            </label>
-            <Input id="last-name" />
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="phone" className="text-sm font-medium">
-            Телефон
-          </label>
-          <Input id="phone" type="tel" placeholder="+7 (___) ___-__-__" />
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium">
-            Email
-          </label>
-          <Input id="email" type="email" />
-        </div>
-        
-        <div className="space-y-2">
-          <label htmlFor="address" className="text-sm font-medium">
-            Адрес доставки (если требуется)
-          </label>
-          <Input id="address" />
-        </div>
-        
-        <div className="mt-2 space-y-3">
-          <div className="flex justify-between">
-            <span>Стоимость аренды:</span>
-            <span>{totalAmount} ₽</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Залог:</span>
-            <span>{depositAmount} ₽</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between font-bold pt-1">
-            <span>Итого к оплате:</span>
-            <span>{totalAmount} ₽</span>
-          </div>
+            </CardContent>
+          </Card>
+          
+          {/* Дополнительная информация */}
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="flex items-start gap-2">
+                  <Icon name="Truck" className="text-primary mt-0.5" size={18} />
+                  <div>
+                    <h3 className="font-medium">Доставка</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Возможна доставка велосипедов по городу (от 300 ₽) или самовывоз из пункта проката.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <Icon name="Shield" className="text-primary mt-0.5" size={18} />
+                  <div>
+                    <h3 className="font-medium">Залог</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Для аренды необходим залог в виде документа или денежных средств.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <Icon name="HelpCircle" className="text-primary mt-0.5" size={18} />
+                  <div>
+                    <h3 className="font-medium">Поддержка</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Если у вас возникли вопросы, позвоните нам по телефону <a href="tel:+79001234567" className="text-primary hover:underline">+7 (900) 123-45-67</a>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>
-          Отмена
-        </Button>
-        <Button onClick={onCheckout}>
-          Оформить заказ
-        </Button>
-      </DialogFooter>
-    </>
+    </div>
   );
-};
-
-// Вспомогательные функции
-
-// Функция для получения правильного склонения слова "часов"
-const getHoursText = (hours: number): string => {
-  const lastDigit = hours % 10;
-  const lastTwoDigits = hours % 100;
-  
-  if (lastDigit === 1 && lastTwoDigits !== 11) {
-    return "час";
-  } else if ([2, 3, 4].includes(lastDigit) && ![12, 13, 14].includes(lastTwoDigits)) {
-    return "часа";
-  } else {
-    return "часов";
-  }
-};
-
-// Функция для получения правильного склонения слова "товаров"
-const getItemsText = (count: number): string => {
-  const lastDigit = count % 10;
-  const lastTwoDigits = count % 100;
-  
-  if (lastDigit === 1 && lastTwoDigits !== 11) {
-    return "товар";
-  } else if ([2, 3, 4].includes(lastDigit) && ![12, 13, 14].includes(lastTwoDigits)) {
-    return "товара";
-  } else {
-    return "товаров";
-  }
-};
-
-// Функция для расчета залога (примерно 50% от стоимости велосипеда)
-const calculateDeposit = (items: any[]) => {
-  return Math.round(items.reduce((total, item) => {
-    // Примерная стоимость велосипеда (20 дней аренды)
-    const bikeValue = item.bike.pricePerHour * 24 * 20;
-    // Залог ~50% от стоимости
-    return total + (bikeValue * 0.5) * item.quantity;
-  }, 0));
 };
 
 export default Cart;
