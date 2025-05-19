@@ -44,8 +44,8 @@ const Navbar = () => {
           </div>
 
           {/* Mobile menu button */}
-          <button 
-            className="md:hidden flex items-center" 
+          <button
+            className="md:hidden flex items-center"
             onClick={() => setIsOpen(!isOpen)}
           >
             <Icon name={isOpen ? "X" : "Menu"} size={24} />
@@ -63,24 +63,24 @@ const Navbar = () => {
             </Link>
             <Link to="/contacts" className="block hover:text-gray-200 py-2 px-3 transition-colors">
               Контакты
-
-              <Link to="/catalog">
-                <Button variant="ghost">Каталог</Button>
-              </Link>
-              <Link to="/cart">
-                <Button variant="ghost">
-                  <Icon name="ShoppingCart" className="mr-2" size={16} />
-                  Корзина
-                </Button>
-              </Link>
-              <Link to="/admin">
-                <Button variant="ghost">Админ</Button>
-              </Link>
-
-                  Войти
-                </Button>
-              </Link>
-            </div>
+            </Link>
+            <Link to="/catalog">
+              <Button variant="ghost">Каталог</Button>
+            </Link>
+            <Link to="/cart">
+              <Button variant="ghost">
+                <Icon name="ShoppingCart" className="mr-2" size={16} />
+                Корзина
+              </Button>
+            </Link>
+            <Link to="/admin">
+              <Button variant="ghost">Админ</Button>
+            </Link>
+            <Link>
+              <Button>
+                Войти
+              </Button>
+            </Link>
           </div>
         )}
       </div>
@@ -89,3 +89,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
