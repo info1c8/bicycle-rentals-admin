@@ -124,8 +124,8 @@ const Team = () => {
                     <p className="text-gray-600 mb-4">{member.bio}</p>
                     <div className="flex gap-2">
                       {member.social.email && (
-                        <Button variant="outline" size="icon">
-                          <Icon name="Mail" size={18} />
+                        <Button variant="outline\" size="icon">
+                          <Icon name="Mail\" size={18} />
                         </Button>
                       )}
                       {member.social.linkedin && (
