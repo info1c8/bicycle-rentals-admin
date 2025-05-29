@@ -1,29 +1,28 @@
-
 import { useState } from "react";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
   CardTitle,
-  CardFooter
+  CardFooter,
 } from "@/components/ui/card";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -32,7 +31,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -51,589 +50,579 @@ import { format, subDays } from "date-fns";
 import { ru } from "date-fns/locale";
 
 // Типы для заказов
+type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "active"
+  | "completed"
+  | "cancelled";
+type PaymentStatus = "unpaid" | "paid" | "refunded";
+
 interface Order {
-  id: number;
-  customer: {
-    id: number;
-    name: string;
-    phone: string;
-    email: string;
-  };
-  bikes: {
-    id: number;
-    name: string;
-    quantity: number;
-    pricePerHour: number;
-    duration: number;
-  }[];
-  date: Date;
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  bikeTitle: string;
+  bikeCategory: string;
   startDate: Date;
   endDate: Date;
-  status: "pending" | "active" | "completed" | "canceled";
-  paymentStatus: "paid" | "unpaid" | "refunded";
-  paymentMethod: "cash" | "card" | "online";
-  totalAmount: number;
+  totalPrice: number;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  createdAt: Date;
   notes?: string;
 }
+
+// Моковые данные заказов
+const mockOrders: Order[] = [
+  {
+    id: "ORD-001",
+    customerName: "Иван Петров",
+    customerEmail: "ivan@example.com",
+    customerPhone: "+7 (999) 123-45-67",
+    bikeTitle: "Горный велосипед Trek",
+    bikeCategory: "Горные",
+    startDate: new Date(2024, 4, 20),
+    endDate: new Date(2024, 4, 22),
+    totalPrice: 3600,
+    status: "active",
+    paymentStatus: "paid",
+    createdAt: subDays(new Date(), 5),
+  },
+  {
+    id: "ORD-002",
+    customerName: "Мария Сидорова",
+    customerEmail: "maria@example.com",
+    customerPhone: "+7 (999) 234-56-78",
+    bikeTitle: "Городской велосипед",
+    bikeCategory: "Городские",
+    startDate: new Date(2024, 4, 25),
+    endDate: new Date(2024, 4, 27),
+    totalPrice: 2400,
+    status: "pending",
+    paymentStatus: "unpaid",
+    createdAt: subDays(new Date(), 2),
+  },
+  {
+    id: "ORD-003",
+    customerName: "Алексей Козлов",
+    customerEmail: "alex@example.com",
+    customerPhone: "+7 (999) 345-67-89",
+    bikeTitle: "Электровелосипед Premium",
+    bikeCategory: "Электро",
+    startDate: new Date(2024, 4, 15),
+    endDate: new Date(2024, 4, 18),
+    totalPrice: 7200,
+    status: "completed",
+    paymentStatus: "paid",
+    createdAt: subDays(new Date(), 10),
+  },
+];
 
 /**
  * Компонент для управления заказами
  */
-const AdminOrderList = () => {
-  const [orders, setOrders] = useState<Order[]>(generateMockOrders());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+const OrderList = () => {
+  const [orders, setOrders] = useState<Order[]>(mockOrders);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isOrderDetailsOpen, setIsOrderDetailsOpen] = useState(false);
-  const [currentTab, setCurrentTab] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Фильтрация заказов
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = 
-      searchQuery.trim() === "" || 
-      order.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.id.toString().includes(searchQuery) ||
-      order.customer.phone.includes(searchQuery);
-    
-    const matchesStatus = statusFilter === "" || order.status === statusFilter;
-    
-    const matchesTab = 
-      currentTab === "all" || 
-      (currentTab === "active" && order.status === "active") ||
-      (currentTab === "pending" && order.status === "pending") ||
-      (currentTab === "completed" && order.status === "completed") ||
-      (currentTab === "canceled" && order.status === "canceled");
-    
-    return matchesSearch && matchesStatus && matchesTab;
+  const filteredOrders = orders.filter((order) => {
+    const matchesStatus =
+      statusFilter === "all" || order.status === statusFilter;
+    const matchesSearch =
+      order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.bikeTitle.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
   });
 
-  // Изменение статуса заказа
-  const handleStatusChange = (orderId: number, newStatus: Order["status"]) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: newStatus } 
-          : order
-      )
+  // Функции для получения статистики
+  const getOrderStats = () => {
+    const total = orders.length;
+    const pending = orders.filter((o) => o.status === "pending").length;
+    const active = orders.filter((o) => o.status === "active").length;
+    const completed = orders.filter((o) => o.status === "completed").length;
+    const totalRevenue = orders
+      .filter((o) => o.paymentStatus === "paid")
+      .reduce((sum, o) => sum + o.totalPrice, 0);
+
+    return { total, pending, active, completed, totalRevenue };
+  };
+
+  const stats = getOrderStats();
+
+  // Функция для изменения статуса заказа
+  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
+    setOrders((prev) =>
+      prev.map((order) =>
+        order.id === orderId ? { ...order, status: newStatus } : order,
+      ),
     );
-    
     toast({
-      title: "Статус заказа изменен",
-      description: `Заказ #${orderId} теперь имеет статус "${getStatusLabel(newStatus)}".`,
+      title: "Статус обновлен",
+      description: `Заказ ${orderId} переведен в статус "${getStatusText(newStatus)}"`,
     });
   };
 
-  // Изменение статуса оплаты
-  const handlePaymentStatusChange = (orderId: number, newStatus: Order["paymentStatus"]) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, paymentStatus: newStatus } 
-          : order
-      )
+  // Функция для экспорта в CSV
+  const exportToCSV = () => {
+    const headers = [
+      "ID",
+      "Клиент",
+      "Велосипед",
+      "Начало",
+      "Конец",
+      "Сумма",
+      "Статус",
+    ];
+    const csvData = filteredOrders.map((order) => [
+      order.id,
+      order.customerName,
+      order.bikeTitle,
+      format(order.startDate, "dd.MM.yyyy"),
+      format(order.endDate, "dd.MM.yyyy"),
+      order.totalPrice,
+      getStatusText(order.status),
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map((row) => row.join(","))
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `orders_${format(new Date(), "yyyy-MM-dd")}.csv`,
     );
-    
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     toast({
-      title: "Статус оплаты изменен",
-      description: `Заказ #${orderId} теперь имеет статус оплаты "${getPaymentStatusLabel(newStatus)}".`,
+      title: "Экспорт завершен",
+      description: "Данные заказов успешно экспортированы в CSV",
     });
   };
 
-  // Открытие деталей заказа
-  const openOrderDetails = (order: Order) => {
-    setSelectedOrder(order);
-    setIsOrderDetailsOpen(true);
+  // Вспомогательные функции
+  const getStatusText = (status: OrderStatus) => {
+    const statusMap = {
+      pending: "Ожидает",
+      confirmed: "Подтвержден",
+      active: "Активный",
+      completed: "Завершен",
+      cancelled: "Отменен",
+    };
+    return statusMap[status];
   };
 
-  // Отмена заказа
-  const handleCancelOrder = (orderId: number) => {
-    handleStatusChange(orderId, "canceled");
+  const getStatusColor = (status: OrderStatus) => {
+    const colorMap = {
+      pending: "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800",
+      active: "bg-green-100 text-green-800",
+      completed: "bg-gray-100 text-gray-800",
+      cancelled: "bg-red-100 text-red-800",
+    };
+    return colorMap[status];
   };
 
-  // Сохранение примечаний к заказу
-  const handleSaveNotes = (orderId: number, notes: string) => {
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, notes } 
-          : order
-      )
-    );
-    
-    toast({
-      title: "Примечания сохранены",
-      description: "Примечания к заказу успешно обновлены.",
-    });
+  const getPaymentStatusColor = (status: PaymentStatus) => {
+    const colorMap = {
+      unpaid: "bg-red-100 text-red-800",
+      paid: "bg-green-100 text-green-800",
+      refunded: "bg-gray-100 text-gray-800",
+    };
+    return colorMap[status];
   };
 
   return (
     <div className="space-y-6">
+      {/* Статистические карточки */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Icon name="ShoppingCart" size={20} className="text-blue-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Всего заказов</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Icon name="Clock" size={20} className="text-yellow-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Ожидающие</p>
+                <p className="text-2xl font-bold">{stats.pending}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Icon name="Play" size={20} className="text-green-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Активные</p>
+                <p className="text-2xl font-bold">{stats.active}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Icon name="Check" size={20} className="text-gray-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Завершенные</p>
+                <p className="text-2xl font-bold">{stats.completed}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Icon name="DollarSign" size={20} className="text-green-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Выручка</p>
+                <p className="text-2xl font-bold">
+                  {stats.totalRevenue.toLocaleString()} ₽
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Основная карточка со списком заказов */}
       <Card>
-        <CardHeader className="space-y-1">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <CardHeader>
+          <div className="flex justify-between items-center">
             <div>
               <CardTitle>Управление заказами</CardTitle>
               <CardDescription>
-                Просмотр и изменение статусов заказов
+                Просмотр и управление всеми заказами на аренду велосипедов
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Icon name="FileDown" className="mr-2" size={16} />
-                Экспорт
-              </Button>
-              <Button variant="outline" size="sm">
-                <Icon name="Printer" className="mr-2" size={16} />
-                Печать
-              </Button>
-            </div>
+            <Button onClick={exportToCSV} variant="outline">
+              <Icon name="Download" size={16} className="mr-2" />
+              Экспорт CSV
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+
           {/* Фильтры и поиск */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Input
-              placeholder="Поиск по имени, номеру заказа или телефону..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1"
-            />
-            <Select
-              value={statusFilter}
-              onValueChange={setStatusFilter}
-            >
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Все статусы" />
+          <div className="flex flex-col sm:flex-row gap-4 mt-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Поиск по клиенту, ID заказа или велосипеду..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Фильтр по статусу" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Все статусы</SelectItem>
-                <SelectItem value="pending">Ожидает</SelectItem>
-                <SelectItem value="active">Активен</SelectItem>
-                <SelectItem value="completed">Завершен</SelectItem>
-                <SelectItem value="canceled">Отменен</SelectItem>
+                <SelectItem value="all">Все статусы</SelectItem>
+                <SelectItem value="pending">Ожидающие</SelectItem>
+                <SelectItem value="confirmed">Подтвержденные</SelectItem>
+                <SelectItem value="active">Активные</SelectItem>
+                <SelectItem value="completed">Завершенные</SelectItem>
+                <SelectItem value="cancelled">Отмененные</SelectItem>
               </SelectContent>
             </Select>
           </div>
+        </CardHeader>
 
-          {/* Вкладки */}
-          <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="all">Все</TabsTrigger>
-              <TabsTrigger value="pending">Ожидающие</TabsTrigger>
-              <TabsTrigger value="active">Активные</TabsTrigger>
-              <TabsTrigger value="completed">Завершенные</TabsTrigger>
-              <TabsTrigger value="canceled">Отмененные</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {/* Таблица заказов */}
-          <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">ID</TableHead>
-                  <TableHead>Клиент</TableHead>
-                  <TableHead className="hidden md:table-cell">Дата</TableHead>
-                  <TableHead className="hidden md:table-cell">Период аренды</TableHead>
-                  <TableHead className="text-right">Сумма</TableHead>
-                  <TableHead className="text-center">Статус</TableHead>
-                  <TableHead className="text-center">Оплата</TableHead>
-                  <TableHead className="w-[100px]">Действия</TableHead>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ID заказа</TableHead>
+                <TableHead>Клиент</TableHead>
+                <TableHead>Велосипед</TableHead>
+                <TableHead>Период аренды</TableHead>
+                <TableHead>Сумма</TableHead>
+                <TableHead>Статус</TableHead>
+                <TableHead>Оплата</TableHead>
+                <TableHead>Действия</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredOrders.map((order) => (
+                <TableRow key={order.id}>
+                  <TableCell className="font-mono">{order.id}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{order.customerName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {order.customerEmail}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{order.bikeTitle}</p>
+                      <Badge variant="secondary" className="text-xs">
+                        {order.bikeCategory}
+                      </Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">
+                      <p>
+                        {format(order.startDate, "dd.MM.yyyy", { locale: ru })}
+                      </p>
+                      <p className="text-muted-foreground">
+                        до {format(order.endDate, "dd.MM.yyyy", { locale: ru })}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {order.totalPrice.toLocaleString()} ₽
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(order.status)}>
+                      {getStatusText(order.status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      className={getPaymentStatusColor(order.paymentStatus)}
+                    >
+                      {order.paymentStatus === "paid"
+                        ? "Оплачен"
+                        : order.paymentStatus === "unpaid"
+                          ? "Не оплачен"
+                          : "Возврат"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <Icon name="MoreHorizontal" size={16} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Действия</DropdownMenuLabel>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setIsOrderDialogOpen(true);
+                          }}
+                        >
+                          <Icon name="Eye" size={16} className="mr-2" />
+                          Подробности
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() =>
+                            updateOrderStatus(order.id, "confirmed")
+                          }
+                        >
+                          <Icon name="Check" size={16} className="mr-2" />
+                          Подтвердить
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => updateOrderStatus(order.id, "active")}
+                        >
+                          <Icon name="Play" size={16} className="mr-2" />
+                          Активировать
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() =>
+                            updateOrderStatus(order.id, "completed")
+                          }
+                        >
+                          <Icon name="CheckCircle" size={16} className="mr-2" />
+                          Завершить
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() =>
+                            updateOrderStatus(order.id, "cancelled")
+                          }
+                          className="text-red-600"
+                        >
+                          <Icon name="X" size={16} className="mr-2" />
+                          Отменить
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-24 text-center">
-                      Заказы не найдены
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredOrders.map((order) => (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-medium">#{order.id}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{order.customer.name}</div>
-                        <div className="text-xs text-muted-foreground">{order.customer.phone}</div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {format(order.date, "dd.MM.yyyy", { locale: ru })}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        <div>{format(order.startDate, "dd.MM.yyyy", { locale: ru })}</div>
-                        <div className="text-xs text-muted-foreground">
-                          до {format(order.endDate, "dd.MM.yyyy", { locale: ru })}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {order.totalAmount} ₽
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <StatusBadge status={order.status} />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <PaymentStatusBadge status={order.paymentStatus} />
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <Icon name="MoreHorizontal" size={16} />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Действия</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => openOrderDetails(order)}>
-                              <Icon name="Eye" className="mr-2" size={14} />
-                              Просмотр деталей
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Изменить статус</DropdownMenuLabel>
-                            <DropdownMenuItem 
-                              onClick={() => handleStatusChange(order.id, "pending")}
-                              disabled={order.status === "pending"}
-                            >
-                              <Icon name="Clock" className="mr-2" size={14} />
-                              Ожидает
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleStatusChange(order.id, "active")}
-                              disabled={order.status === "active"}
-                            >
-                              <Icon name="Play" className="mr-2" size={14} />
-                              Активен
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleStatusChange(order.id, "completed")}
-                              disabled={order.status === "completed"}
-                            >
-                              <Icon name="CheckCircle" className="mr-2" size={14} />
-                              Завершен
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleStatusChange(order.id, "canceled")}
-                              disabled={order.status === "canceled"}
-                            >
-                              <Icon name="XCircle" className="mr-2" size={14} />
-                              Отменен
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Статус оплаты</DropdownMenuLabel>
-                            <DropdownMenuItem 
-                              onClick={() => handlePaymentStatusChange(order.id, "paid")}
-                              disabled={order.paymentStatus === "paid"}
-                            >
-                              <Icon name="CreditCard" className="mr-2" size={14} />
-                              Оплачен
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handlePaymentStatusChange(order.id, "unpaid")}
-                              disabled={order.paymentStatus === "unpaid"}
-                            >
-                              <Icon name="AlertCircle" className="mr-2" size={14} />
-                              Не оплачен
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handlePaymentStatusChange(order.id, "refunded")}
-                              disabled={order.paymentStatus === "refunded"}
-                            >
-                              <Icon name="RotateCcw" className="mr-2" size={14} />
-                              Возврат
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
-        <CardFooter className="flex items-center justify-between border-t p-4">
-          <div className="text-sm text-muted-foreground">
+
+        <CardFooter>
+          <p className="text-sm text-muted-foreground">
             Показано {filteredOrders.length} из {orders.length} заказов
-          </div>
-          <div className="text-sm font-medium">
-            Общая сумма: {filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0)} ₽
-          </div>
+          </p>
         </CardFooter>
       </Card>
 
-      {/* Диалог с деталями заказа */}
-      <Dialog open={isOrderDetailsOpen} onOpenChange={setIsOrderDetailsOpen}>
-        <DialogContent className="sm:max-w-[700px]">
+      {/* Диалог с подробностями заказа */}
+      <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Подробности заказа {selectedOrder?.id}</DialogTitle>
+            <DialogDescription>
+              Полная информация о заказе и клиенте
+            </DialogDescription>
+          </DialogHeader>
+
           {selectedOrder && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center justify-between">
-                  <span>Заказ #{selectedOrder.id}</span>
-                  <StatusBadge status={selectedOrder.status} />
-                </DialogTitle>
-                <DialogDescription>
-                  Детали заказа от {format(selectedOrder.date, "dd MMMM yyyy", { locale: ru })}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-6">
-                {/* Информация о клиенте */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Информация о клиенте</h3>
-                  <div className="bg-muted/40 p-3 rounded-md">
-                    <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-6">
+              <Tabs defaultValue="order" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="order">Заказ</TabsTrigger>
+                  <TabsTrigger value="customer">Клиент</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="order" className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Велосипед</label>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedOrder.bikeTitle}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Категория</label>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedOrder.bikeCategory}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Начало аренды
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        {format(selectedOrder.startDate, "dd.MM.yyyy HH:mm", {
+                          locale: ru,
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Конец аренды
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        {format(selectedOrder.endDate, "dd.MM.yyyy HH:mm", {
+                          locale: ru,
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Общая стоимость
+                      </label>
+                      <p className="text-lg font-bold">
+                        {selectedOrder.totalPrice.toLocaleString()} ₽
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">
+                        Дата создания
+                      </label>
+                      <p className="text-sm text-muted-foreground">
+                        {format(selectedOrder.createdAt, "dd.MM.yyyy HH:mm", {
+                          locale: ru,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex gap-2">
+                      <Badge className={getStatusColor(selectedOrder.status)}>
+                        {getStatusText(selectedOrder.status)}
+                      </Badge>
+                      <Badge
+                        className={getPaymentStatusColor(
+                          selectedOrder.paymentStatus,
+                        )}
+                      >
+                        {selectedOrder.paymentStatus === "paid"
+                          ? "Оплачен"
+                          : selectedOrder.paymentStatus === "unpaid"
+                            ? "Не оплачен"
+                            : "Возврат"}
+                      </Badge>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="customer" className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Имя клиента</label>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedOrder.customerName}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Email</label>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedOrder.customerEmail}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Телефон</label>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedOrder.customerPhone}
+                      </p>
+                    </div>
+                    {selectedOrder.notes && (
                       <div>
-                        <div className="text-sm font-medium">{selectedOrder.customer.name}</div>
-                        <div className="text-xs text-muted-foreground">ID: {selectedOrder.customer.id}</div>
+                        <label className="text-sm font-medium">
+                          Примечания
+                        </label>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedOrder.notes}
+                        </p>
                       </div>
-                      <div className="text-right">
-                        <div className="text-sm">{selectedOrder.customer.phone}</div>
-                        <div className="text-xs text-muted-foreground">{selectedOrder.customer.email}</div>
-                      </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-                
-                {/* Детали аренды */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Арендованные велосипеды</h3>
-                  <div className="space-y-2">
-                    {selectedOrder.bikes.map((bike, index) => (
-                      <div key={index} className="bg-muted/40 p-3 rounded-md">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{bike.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {bike.pricePerHour} ₽/час × {bike.duration} час × {bike.quantity} шт.
-                            </div>
-                          </div>
-                          <div className="text-right font-medium">
-                            {bike.pricePerHour * bike.duration * bike.quantity} ₽
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Сводка заказа */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Сводка заказа</h3>
-                  <div className="bg-muted/40 p-3 rounded-md space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Период аренды:</span>
-                      <span className="text-sm font-medium">
-                        {format(selectedOrder.startDate, "dd.MM.yyyy", { locale: ru })} — {format(selectedOrder.endDate, "dd.MM.yyyy", { locale: ru })}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Способ оплаты:</span>
-                      <span className="text-sm font-medium">
-                        {selectedOrder.paymentMethod === "cash" && "Наличные"}
-                        {selectedOrder.paymentMethod === "card" && "Банковская карта"}
-                        {selectedOrder.paymentMethod === "online" && "Онлайн-платеж"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Статус оплаты:</span>
-                      <PaymentStatusBadge status={selectedOrder.paymentStatus} />
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between">
-                      <span className="text-sm font-bold">Итого:</span>
-                      <span className="text-sm font-bold">{selectedOrder.totalAmount} ₽</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Примечания */}
-                <div>
-                  <h3 className="text-sm font-medium mb-2">Примечания к заказу</h3>
-                  <textarea
-                    className="w-full border rounded-md p-2 text-sm min-h-[80px]"
-                    placeholder="Добавьте примечания к заказу здесь..."
-                    defaultValue={selectedOrder.notes || ""}
-                    onBlur={(e) => handleSaveNotes(selectedOrder.id, e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              <DialogFooter className="gap-2 sm:gap-0">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsOrderDetailsOpen(false)}
-                  >
-                    Закрыть
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      handleCancelOrder(selectedOrder.id);
-                      setIsOrderDetailsOpen(false);
-                    }}
-                    disabled={selectedOrder.status === "canceled"}
-                  >
-                    Отменить заказ
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      // Имитируем отправку электронного письма
-                      toast({
-                        title: "Чек отправлен",
-                        description: `Чек был отправлен на почту ${selectedOrder.customer.email}`,
-                      });
-                    }}
-                  >
-                    <Icon name="Mail" className="mr-2" size={16} />
-                    Отправить чек
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      // Имитируем печать чека
-                      toast({
-                        title: "Печать чека",
-                        description: "Чек отправлен на печать",
-                      });
-                    }}
-                  >
-                    <Icon name="Printer" className="mr-2" size={16} />
-                    Печать чека
-                  </Button>
-                </div>
-              </DialogFooter>
-            </>
+                </TabsContent>
+              </Tabs>
+            </div>
           )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsOrderDialogOpen(false)}
+            >
+              Закрыть
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 };
 
-// Вспомогательные компоненты
-interface StatusBadgeProps {
-  status: Order["status"];
-}
-
-const StatusBadge = ({ status }: StatusBadgeProps) => {
-  let variant: "outline" | "secondary" | "destructive" = "outline";
-  let label = getStatusLabel(status);
-  
-  if (status === "active") variant = "secondary";
-  if (status === "canceled") variant = "destructive";
-  
-  return (
-    <Badge variant={variant} className="whitespace-nowrap">
-      {label}
-    </Badge>
-  );
-};
-
-interface PaymentStatusBadgeProps {
-  status: Order["paymentStatus"];
-}
-
-const PaymentStatusBadge = ({ status }: PaymentStatusBadgeProps) => {
-  let variant: "outline" | "secondary" | "destructive" = "outline";
-  let label = getPaymentStatusLabel(status);
-  
-  if (status === "paid") variant = "secondary";
-  if (status === "refunded") variant = "destructive";
-  
-  return (
-    <Badge variant={variant} className="whitespace-nowrap">
-      {label}
-    </Badge>
-  );
-};
-
-// Вспомогательные функции
-function getStatusLabel(status: Order["status"]): string {
-  switch (status) {
-    case "pending": return "Ожидает";
-    case "active": return "Активен";
-    case "completed": return "Завершен";
-    case "canceled": return "Отменен";
-  }
-}
-
-function getPaymentStatusLabel(status: Order["paymentStatus"]): string {
-  switch (status) {
-    case "paid": return "Оплачен";
-    case "unpaid": return "Не оплачен";
-    case "refunded": return "Возврат";
-  }
-}
-
-// Генерация моковых данных
-function generateMockOrders(): Order[] {
-  const orders: Order[] = [];
-  
-  const bikes = [
-    { id: 1, name: "Горный велосипед Trek", pricePerHour: 250 },
-    { id: 2, name: "Городской велосипед Schwinn", pricePerHour: 200 },
-    { id: 3, name: "Шоссейный велосипед Giant", pricePerHour: 300 },
-    { id: 4, name: "Складной велосипед Brompton", pricePerHour: 180 },
-    { id: 5, name: "Электровелосипед Haibike", pricePerHour: 400 },
-  ];
-  
-  const customers = [
-    { id: 1, name: "Иванов Павел", phone: "+7 (912) 345-67-89", email: "ivanov@example.com" },
-    { id: 2, name: "Смирнова Анна", phone: "+7 (923) 456-78-90", email: "smirnova@example.com" },
-    { id: 3, name: "Козлов Максим", phone: "+7 (934) 567-89-01", email: "kozlov@example.com" },
-    { id: 4, name: "Васильева Ольга", phone: "+7 (945) 678-90-12", email: "vasilyeva@example.com" },
-    { id: 5, name: "Николаев Дмитрий", phone: "+7 (956) 789-01-23", email: "nikolaev@example.com" },
-  ];
-  
-  const statuses: Order["status"][] = ["pending", "active", "completed", "canceled"];
-  const paymentStatuses: Order["paymentStatus"][] = ["paid", "unpaid", "refunded"];
-  const paymentMethods: Order["paymentMethod"][] = ["cash", "card", "online"];
-  
-  for (let i = 1; i <= 25; i++) {
-    const customer = customers[Math.floor(Math.random() * customers.length)];
-    const date = subDays(new Date(), Math.floor(Math.random() * 30));
-    const startDate = subDays(new Date(), Math.floor(Math.random() * 14));
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + Math.floor(Math.random() * 5) + 1);
-    
-    const bikeCount = Math.floor(Math.random() * 3) + 1;
-    const orderBikes = [];
-    let totalAmount = 0;
-    
-    for (let j = 0; j < bikeCount; j++) {
-      const bike = bikes[Math.floor(Math.random() * bikes.length)];
-      const quantity = Math.floor(Math.random() * 2) + 1;
-      const duration = Math.floor(Math.random() * 24) + 1;
-      
-      orderBikes.push({
-        id: bike.id,
-        name: bike.name,
-        quantity,
-        pricePerHour: bike.pricePerHour,
-        duration,
-      });
-      
-      totalAmount += bike.pricePerHour * quantity * duration;
-    }
-    
-    orders.push({
-      id: 100 + i,
-      customer,
-      bikes: orderBikes,
-      date,
-      startDate,
-      endDate,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      paymentStatus: paymentStatuses[Math.floor(Math.random() * paymentStatuses.length)],
-      paymentMethod: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
-      totalAmount,
-    });
-  }
-  
-  return orders;
-}
-
-export default AdminOrderList;
+export default OrderList;
