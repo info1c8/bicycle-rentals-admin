@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import Icon from "@/components/ui/icon";
@@ -7,7 +8,7 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="py-4 text-white shadow-md bg-yellow-900">
+    <nav className="bg-primary py-4 text-white shadow-md">
       <div className="container mx-auto px-4 md:px-6">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center space-x-2">
@@ -17,38 +18,24 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
-            <Link
-              to="/catalog"
-              className="hover:text-gray-200 transition-colors"
-            >
+            <Link to="/catalog" className="hover:text-gray-200 transition-colors">
               Каталог
             </Link>
             <Link to="/about" className="hover:text-gray-200 transition-colors">
               О нас
             </Link>
-            <Link
-              to="/contacts"
-              className="hover:text-gray-200 transition-colors"
-            >
+            <Link to="/contacts" className="hover:text-gray-200 transition-colors">
               Контакты
             </Link>
             <div className="flex items-center space-x-3">
               <Link to="/cart">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="flex items-center"
-                >
+                <Button variant="secondary" size="sm" className="flex items-center">
                   <Icon name="ShoppingCart" size={18} className="mr-1" />
                   Корзина
                 </Button>
               </Link>
               <Link to="/login">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="bg-white/10 hover:bg-white/20"
-                >
+                <Button variant="outline" size="sm" className="bg-white/10 hover:bg-white/20">
                   <Icon name="LogIn" size={18} className="mr-1" />
                   Войти
                 </Button>
@@ -57,8 +44,8 @@ const Navbar = () => {
           </div>
 
           {/* Mobile menu button */}
-          <button
-            className="md:hidden flex items-center"
+          <button 
+            className="md:hidden flex items-center" 
             onClick={() => setIsOpen(!isOpen)}
           >
             <Icon name={isOpen ? "X" : "Menu"} size={24} />
@@ -68,39 +55,29 @@ const Navbar = () => {
         {/* Mobile Navigation */}
         {isOpen && (
           <div className="md:hidden mt-4 space-y-3 pb-3">
-            <Link
-              to="/catalog"
-              className="block hover:text-gray-200 py-2 px-3 transition-colors"
-            >
+            <Link to="/catalog" className="block hover:text-gray-200 py-2 px-3 transition-colors">
               Каталог
             </Link>
-            <Link
-              to="/about"
-              className="block hover:text-gray-200 py-2 px-3 transition-colors"
-            >
+            <Link to="/about" className="block hover:text-gray-200 py-2 px-3 transition-colors">
               О нас
             </Link>
-            <Link
-              to="/contacts"
-              className="block hover:text-gray-200 py-2 px-3 transition-colors"
-            >
+            <Link to="/contacts" className="block hover:text-gray-200 py-2 px-3 transition-colors">
               Контакты
             </Link>
-            <Link to="/catalog">
-              <Button variant="ghost">Каталог</Button>
-            </Link>
-            <Link to="/cart">
-              <Button variant="ghost">
-                <Icon name="ShoppingCart" className="mr-2" size={16} />
-                Корзина
-              </Button>
-            </Link>
-            <Link to="/admin">
-              <Button variant="ghost">Админ</Button>
-            </Link>
-            <Link>
-              <Button>Войти</Button>
-            </Link>
+            <div className="flex flex-col space-y-2 pt-2">
+              <Link to="/cart" className="block">
+                <Button variant="secondary" size="sm" className="w-full flex items-center justify-center">
+                  <Icon name="ShoppingCart" size={18} className="mr-1" />
+                  Корзина
+                </Button>
+              </Link>
+              <Link to="/login" className="block">
+                <Button variant="outline" size="sm" className="w-full bg-white/10 hover:bg-white/20">
+                  <Icon name="LogIn" size={18} className="mr-1" />
+                  Войти
+                </Button>
+              </Link>
+            </div>
           </div>
         )}
       </div>
